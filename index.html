@@ -20,6 +20,8 @@
         #game-container {
             max-width: 900px;
             width: 100%;
+            /* Added transition for animations */
+            transition: all 0.3s ease-in-out;
         }
         .letter-button {
             padding: 10px 15px;
@@ -59,7 +61,7 @@
             stroke-width: 4;
             stroke-linecap: round;
             /* Added transition for smooth reveal */
-            transition: visibility 0s, opacity 0.3s ease-in; 
+            transition: visibility 0s, opacity 0.3s ease-in, stroke 0.3s; 
         }
         /* Hide all parts initially */
         #hangman-parts .hangman-part {
@@ -69,6 +71,31 @@
         /* Override for visible parts */
         #hangman-parts .hangman-part[style*="visibility: visible"] {
             opacity: 1;
+        }
+        
+        /* NEW: Visual Polish Animations */
+        @keyframes win-glow {
+            0%, 100% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.7), 0 25px 50px -12px rgba(0, 0, 0, 0.25); } /* Green-500 */
+            50% { box-shadow: 0 0 50px rgba(16, 185, 129, 0.9), 0 25px 50px -12px rgba(0, 0, 0, 0.4); }
+        }
+
+        @keyframes lose-flash {
+            0% { background-color: #fca5a5; border-color: #ef4444; } /* Red-400 */
+            100% { background-color: #fee2e2; border-color: #f87171; } /* Red-100 */
+        }
+
+        .game-win {
+            animation: win-glow 1.5s infinite alternate;
+        }
+
+        .game-loss {
+            animation: lose-flash 0.3s 4 alternate; /* Flash 4 times on loss */
+            border: 4px solid #ef4444; /* Red border on loss */
+        }
+        
+        /* Ensure Hangman parts are red on loss */
+        .hangman-part.fatal-error {
+            stroke: #ef4444 !important; /* Red-500 */
         }
 
         /* Improved Keyboard Layout */
@@ -142,10 +169,14 @@
                     <p class="text-sm italic text-gray-400">Guessed Letters: <span id="guessed-letters-display">None</span></p>
                 </div>
 
-                <!-- Control Buttons -->
+                <!-- Control Buttons (Updated to include Load Game button) -->
                 <div class="flex justify-center space-x-4 pt-4">
                     <button id="hint-button" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition duration-150 shadow-md hover:shadow-lg">
                         Get Hint (H)
+                    </button>
+                    <!-- Load button, hidden by default -->
+                    <button id="load-button" class="hidden bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition duration-150 shadow-md hover:shadow-lg">
+                        Load Game
                     </button>
                     <button id="reset-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150 shadow-md hover:shadow-lg">
                         New Game
@@ -161,14 +192,37 @@
         </div>
     </div>
     
-    <!-- Modal for Difficulty/Game Over -->
+    <!-- Modal for Difficulty/Game Over/Custom Word Entry -->
     <div id="modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden">
         <div id="modal-content" class="bg-white rounded-xl shadow-2xl p-8 w-11/12 max-w-md text-center space-y-6 transform transition-all duration-300 scale-95">
             <h2 id="modal-title" class="text-3xl font-bold text-gray-800"></h2>
             <p id="modal-text" class="text-lg text-gray-600"></p>
+            
+            <!-- Custom Word Input Area (NEW) -->
+            <div id="custom-word-area" class="space-y-4 hidden">
+                <input type="text" id="custom-word-input" placeholder="Secret Word/Phrase (A-Z, space, hyphen)" class="w-full p-3 border-2 border-indigo-300 rounded-lg text-center text-xl uppercase tracking-widest font-mono focus:ring-indigo-500 focus:border-indigo-500"/>
+                <input type="text" id="custom-category-input" placeholder="Category (e.g., Movie, Food)" class="w-full p-3 border-2 border-gray-300 rounded-lg text-center text-lg focus:ring-indigo-500 focus:border-indigo-500"/>
+                <p id="custom-word-error" class="text-red-500 text-sm hidden">Please enter a valid word (A-Z only, min 3 letters).</p>
+                <button id="start-custom-game-button" class="w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 transition duration-150 shadow-md">
+                    Start Custom Game
+                </button>
+            </div>
+            
+            <!-- Difficulty Options Area -->
             <div id="difficulty-options" class="grid grid-cols-3 gap-4">
                 <!-- Difficulty buttons here -->
             </div>
+
+            <!-- Main Menu Buttons (Re-used for back button) -->
+            <div id="main-menu-options" class="space-y-3">
+                <button id="custom-word-button" class="w-full bg-purple-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-purple-600 transition duration-150 shadow-md">
+                    Play Custom Word
+                </button>
+                <button id="back-to-menu-button" class="w-full bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg hover:bg-gray-400 transition duration-150 shadow-sm hidden">
+                    &larr; Back to Main Menu
+                </button>
+            </div>
+
             <button id="modal-close-button" class="bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-indigo-700 transition duration-150 w-full hidden">
                 Play Again
             </button>
@@ -177,9 +231,28 @@
 
 
     <script>
-        // --- Game Configuration (Updated with Python-centric words and Categories) ---
+        // --- Game Configuration (Updated with daily life words) ---
         const WORD_LIST = [
-            // Python Specific Terms (Enhanced for the theme)
+            // --- NEW: Daily Life Words and Phrases ---
+            { word: "COFFEE", category: "Daily Drink" },
+            { word: "MOBILE PHONE", category: "Electronics" },
+            { word: "WATER BOTTLE", category: "Household Item" },
+            { word: "GROCERY STORE", category: "Place" },
+            { word: "BRUSH TEETH", category: "Routine" },
+            { word: "TELEVISION", category: "Home Entertainment" },
+            { word: "EAT BREAKFAST", category: "Routine" },
+            { word: "VEGETABLES", category: "Food" },
+            { word: "CHAIR", category: "Furniture" },
+            { word: "KEYBOARD", category: "Computer Part" },
+            { word: "NOTEBOOK", category: "Office Supply" },
+            { word: "SHOWER", category: "Routine" },
+            { word: "ELECTRICITY", category: "Utility" },
+            
+            // --- Tech/CS Words (Previous List) ---
+            { word: "STAR WARS", category: "Movie Franchise" },
+            { word: "FRONT END", category: "Development Term" },
+            { word: "DATA-SET", category: "Data Science" },
+            { word: "MACHINE LEARNING", category: "Artificial Intelligence" },
             { word: "PYTHON", category: "Programming Language" },
             { word: "FLASK", category: "Python Framework" },
             { word: "DJANGO", category: "Python Framework" },
@@ -188,8 +261,6 @@
             { word: "IMPORT", category: "Python Keyword" },
             { word: "ASYNC", category: "Python Keyword" },
             { word: "LAMBDA", category: "Python Function" },
-            
-            // General CS/Tech Terms
             { word: "GEMINI", category: "AI Model" },
             { word: "CANVAS", category: "Frontend Dev" },
             { word: "ALGORITHM", category: "Computer Science" },
@@ -230,6 +301,7 @@
         const keyboard = document.getElementById('keyboard');
         const hintButton = document.getElementById('hint-button');
         const resetButton = document.getElementById('reset-button');
+        const loadButton = document.getElementById('load-button'); // New DOM element
         const guessedLettersDisplay = document.getElementById('guessed-letters-display');
         const currentDifficulty = document.getElementById('current-difficulty');
         const hintPenaltyDisplay = document.getElementById('hint-penalty');
@@ -240,23 +312,126 @@
         const modalText = document.getElementById('modal-text');
         const difficultyOptions = document.getElementById('difficulty-options');
         const modalCloseButton = document.getElementById('modal-close-button');
+        const gameContainer = document.getElementById('game-container'); // NEW for animations
 
+        // NEW CUSTOM WORD ELEMENTS
+        const customWordArea = document.getElementById('custom-word-area');
+        const customWordInput = document.getElementById('custom-word-input');
+        const customCategoryInput = document.getElementById('custom-category-input');
+        const customWordError = document.getElementById('custom-word-error');
+        const startCustomGameButton = document.getElementById('start-custom-game-button');
+        const customWordButton = document.getElementById('custom-word-button');
+        const backToMenuButton = document.getElementById('back-to-menu-button');
+        const mainMenuOptions = document.getElementById('main-menu-options'); // Container for custom word button and back button
+
+
+        // --- Save/Load Functions ---
+
+        function saveGameState() {
+            // Check if game is over (win/loss), if so, do not save and clear previous state
+            const wordComplete = Array.from(secretWord).filter(char => char >= 'A' && char <= 'Z').every(letter => guessedLetters.has(letter));
+            if (incorrectCount >= maxIncorrectGuesses || wordComplete) {
+                localStorage.removeItem('hangman_save_state');
+                checkSavedGameAndShowLoadButton(); // Update button visibility
+                return;
+            }
+
+            const gameState = {
+                word: secretWord,
+                category: secretCategory,
+                guessed: Array.from(guessedLetters),
+                incorrect: incorrectCount,
+                score: GAME_SCORE,
+                maxGuesses: maxIncorrectGuesses,
+                hintPenalty: hintPenalty,
+                hintUsed: hintUsed
+            };
+            localStorage.setItem('hangman_save_state', JSON.stringify(gameState));
+            localStorage.setItem('hangman_high_score', HIGH_SCORE); // Ensure high score is saved
+            checkSavedGameAndShowLoadButton(); // Update button visibility
+        }
+
+        function loadGameState() {
+            const savedState = localStorage.getItem('hangman_save_state');
+            if (!savedState) {
+                statusMessage.textContent = "No saved game found!";
+                return false;
+            }
+
+            try {
+                const state = JSON.parse(savedState);
+                
+                // Restore state
+                secretWord = state.word;
+                secretCategory = state.category;
+                guessedLetters = new Set(state.guessed);
+                incorrectCount = state.incorrect;
+                GAME_SCORE = state.score;
+                maxIncorrectGuesses = state.maxGuesses;
+                hintPenalty = state.hintPenalty;
+                hintUsed = state.hintUsed;
+                
+                // Ensure High Score is loaded correctly (though it should be at startup)
+                HIGH_SCORE = parseInt(localStorage.getItem('hangman_high_score') || 0);
+
+                createLetterButtons();
+                renderGame();
+                statusMessage.textContent = "Game loaded. Resume guessing!";
+                
+                // Check if the loaded game is already won/lost (shouldn't happen, but good check)
+                const wordComplete = Array.from(secretWord).filter(char => char >= 'A' && char <= 'Z').every(letter => guessedLetters.has(letter));
+                if (incorrectCount >= maxIncorrectGuesses || wordComplete) {
+                    disableGameInteraction();
+                    localStorage.removeItem('hangman_save_state'); // Clear invalid state
+                    statusMessage.textContent = "Saved game was already over. Press 'New Game' to start.";
+                }
+                
+                // Reset animations after load
+                gameContainer.classList.remove('game-win', 'game-loss');
+                Array.from(hangmanParts).forEach(part => part.classList.remove('fatal-error'));
+
+                return true;
+            } catch (e) {
+                console.error("Error loading game state:", e);
+                localStorage.removeItem('hangman_save_state'); // Clear corrupted state
+                statusMessage.textContent = "Error loading saved game. Starting new session.";
+                return false;
+            }
+        }
+
+        function checkSavedGameAndShowLoadButton() {
+            if (localStorage.getItem('hangman_save_state')) {
+                loadButton.classList.remove('hidden');
+            } else {
+                loadButton.classList.add('hidden');
+            }
+        }
 
         // --- Core Functions ---
 
         function renderGame() {
-            // 1. Render Word Display
+            // 1. Render Word Display (Updated to handle spaces and hyphens)
             let display = '';
             let wordComplete = true;
-            for (const letter of secretWord) {
-                if (guessedLetters.has(letter)) {
-                    display += letter + ' ';
+            
+            // Only count actual letters for win condition
+            const lettersToGuess = Array.from(secretWord).filter(char => char >= 'A' && char <= 'Z');
+
+            for (const char of secretWord) {
+                if (char === ' ' || char === '-') {
+                    display += char + ' '; // Display spaces/dashes directly
+                } else if (guessedLetters.has(char)) {
+                    display += char + ' ';
                 } else {
                     display += '_ ';
                     wordComplete = false;
                 }
             }
             wordDisplay.textContent = display.trim();
+
+            // Check if all actual letters have been guessed
+            wordComplete = lettersToGuess.every(letter => guessedLetters.has(letter));
+
 
             // 2. Render Hangman
             // Use the actual number of SVG parts (now 8) to show corresponding incorrect guesses.
@@ -272,7 +447,15 @@
             scoreDisplay.textContent = `Score: ${GAME_SCORE} (High: ${HIGH_SCORE})`;
             guessesDisplay.textContent = `Guesses Left: ${maxIncorrectGuesses - incorrectCount}`;
             guessedLettersDisplay.textContent = guessedLetters.size > 0 ? Array.from(guessedLetters).sort().join(', ') : 'None';
-            currentDifficulty.textContent = DIFFICULTY_SETTINGS[getDifficultyKey()].name;
+            
+            // Ensure difficulty key exists before accessing name
+            const currentKey = getDifficultyKey();
+            if (currentKey) {
+                currentDifficulty.textContent = DIFFICULTY_SETTINGS[currentKey].name;
+            } else {
+                currentDifficulty.textContent = 'Unknown';
+            }
+
             hintPenaltyDisplay.textContent = hintPenalty;
             categoryDisplay.textContent = secretCategory; // Display the category
             
@@ -296,16 +479,16 @@
                 }
             });
             
-            hintButton.disabled = hintUsed;
-            hintButton.classList.toggle('bg-gray-400', hintUsed);
-            hintButton.classList.toggle('hover:bg-gray-400', hintUsed);
-            hintButton.classList.toggle('bg-yellow-500', !hintUsed);
-            hintButton.classList.toggle('hover:bg-yellow-600', !hintUsed);
+            hintButton.disabled = hintUsed || incorrectCount >= maxIncorrectGuesses || wordComplete;
+            hintButton.classList.toggle('bg-gray-400', hintUsed || hintButton.disabled);
+            hintButton.classList.toggle('hover:bg-gray-400', hintUsed || hintButton.disabled);
+            hintButton.classList.toggle('bg-yellow-500', !hintUsed && !hintButton.disabled);
+            hintButton.classList.toggle('hover:bg-yellow-600', !hintUsed && !hintButton.disabled);
         
-            // 5. Check Win/Loss (Updated to save High Score)
+            // 5. Check Win/Loss (Updated to save High Score and add animations)
             if (wordComplete) {
                 GAME_SCORE++;
-                let resultText = `Congratulations! The word was **${secretWord}**. Your score is now ${GAME_SCORE}.`;
+                let resultText = `Congratulations! The phrase was **${secretWord}**. Your score is now ${GAME_SCORE}.`;
                 
                 // Check and save new High Score
                 if (GAME_SCORE > HIGH_SCORE) {
@@ -314,12 +497,16 @@
                     resultText += ` **NEW HIGH SCORE!**`;
                 }
                 
+                saveGameState(); // Call save one last time (will clear the state)
                 showResultModal("You Win!", resultText, 'win');
                 disableGameInteraction();
             } else if (incorrectCount >= maxIncorrectGuesses) {
-                showResultModal("Game Over!", `You ran out of guesses. The word was **${secretWord}**.`, 'loss');
-                // Score reset is implicitly handled when starting a new game session via modal
+                saveGameState(); // Call save one last time (will clear the state)
+                showResultModal("Game Over!", `You ran out of guesses. The phrase was **${secretWord}**.`, 'loss');
                 disableGameInteraction();
+            } else {
+                // IMPORTANT: Save game state after successful render (only if not won/lost)
+                saveGameState();
             }
         }
 
@@ -337,19 +524,25 @@
 
             guessedLetters.add(letter);
 
+            // Check if the secret word contains the guessed letter (case insensitive for custom words)
+            // Note: secretWord is always uppercase, so this check is reliable.
             if (secretWord.includes(letter)) {
-                statusMessage.textContent = `Correct! The letter '${letter}' is in the word.`;
+                statusMessage.textContent = `Correct! The letter '${letter}' is in the word/phrase.`;
             } else {
                 incorrectCount++;
-                statusMessage.textContent = `Incorrect! The letter '${letter}' is not in the word.`;
+                statusMessage.textContent = `Incorrect! The letter '${letter}' is not in the word/phrase.`;
             }
+            // Save is handled inside renderGame
             renderGame();
         }
 
         function handleHint() {
             if (hintUsed || incorrectCount >= maxIncorrectGuesses) return;
 
-            const unguessedLetters = Array.from(secretWord).filter(letter => !guessedLetters.has(letter));
+            // Filter for unguessed actual letters (A-Z)
+            const unguessedLetters = Array.from(secretWord)
+                .filter(char => char >= 'A' && char <= 'Z')
+                .filter(letter => !guessedLetters.has(letter));
 
             if (unguessedLetters.length > 0) {
                 const hint = unguessedLetters[Math.floor(Math.random() * unguessedLetters.length)];
@@ -359,6 +552,7 @@
                 GAME_SCORE = Math.max(0, GAME_SCORE - hintPenalty);
                 statusMessage.textContent = `HINT used! Letter '${hint}' revealed. Score -${hintPenalty}.`;
                 
+                // Save is handled inside renderGame
                 renderGame();
             } else {
                 statusMessage.textContent = "No hints needed, word is almost complete!";
@@ -385,7 +579,12 @@
             }
         }
 
+        // Initialize game with a random word
         function initGame(difficultyKey) {
+            // Reset animations
+            gameContainer.classList.remove('game-win', 'game-loss');
+            Array.from(hangmanParts).forEach(part => part.classList.remove('fatal-error'));
+
             // Apply difficulty settings
             const settings = DIFFICULTY_SETTINGS[difficultyKey];
             maxIncorrectGuesses = settings.guesses;
@@ -404,9 +603,44 @@
             createLetterButtons();
             statusMessage.textContent = "Guess a letter!";
             resetButton.textContent = "New Game"; 
-
+            
+            // Clear any old saved state when starting a new game session
+            localStorage.removeItem('hangman_save_state'); 
+            
             renderGame();
-            console.log("New game started. Word is:", secretWord, "Category:", secretCategory);
+            console.log("New random game started. Word is:", secretWord, "Category:", secretCategory);
+        }
+
+        // NEW: Initialize game with a custom word
+        function initCustomGame(word, category, difficultyKey) {
+            // Reset animations
+            gameContainer.classList.remove('game-win', 'game-loss');
+            Array.from(hangmanParts).forEach(part => part.classList.remove('fatal-error'));
+
+            // Use Medium difficulty settings for custom games for simplicity
+            const settings = DIFFICULTY_SETTINGS[difficultyKey]; 
+            maxIncorrectGuesses = settings.guesses;
+            hintPenalty = settings.hint_cost;
+
+            // Set custom word and category
+            secretWord = word.toUpperCase().trim();
+            secretCategory = category.trim() || 'Custom Word'; 
+            
+            // Reset state
+            guessedLetters.clear();
+            incorrectCount = 0;
+            hintUsed = false;
+            
+            // Re-enable buttons and update status
+            createLetterButtons();
+            statusMessage.textContent = "Time to guess the custom word!";
+            resetButton.textContent = "New Game"; 
+            
+            // Clear saved state
+            localStorage.removeItem('hangman_save_state'); 
+            
+            renderGame();
+            console.log("Custom game started. Word is:", secretWord, "Category:", secretCategory);
         }
 
         function showResultModal(title, text, type) {
@@ -414,78 +648,158 @@
             modalText.innerHTML = text; // Use innerHTML for bold text
             
             modalCloseButton.textContent = "Play Next Word";
-            // Important: We reset GAME_SCORE only if starting a FRESH game (via the reset button logic in showDifficultyModal)
-            // But if they click 'Play Next Word' (modalCloseButton), the score carries over, which is desired for chaining wins.
-            modalCloseButton.onclick = () => {
-                const currentDiffKey = getDifficultyKey();
-                initGame(currentDiffKey);
-                modal.classList.add('hidden');
-            };
-            modalCloseButton.classList.remove('hidden');
-
-            // Style based on outcome
+            
+            // NEW: Add animations based on outcome
+            gameContainer.classList.remove('game-win', 'game-loss'); // Reset
             if (type === 'win') {
+                gameContainer.classList.add('game-win');
                 modalTitle.classList.remove('text-red-500', 'text-gray-800');
                 modalTitle.classList.add('text-green-600');
             } else if (type === 'loss') {
+                gameContainer.classList.add('game-loss');
+                // Make the drawn parts red on loss
+                Array.from(hangmanParts).slice(0, Math.min(incorrectCount, hangmanParts.length)).forEach(part => part.classList.add('fatal-error'));
                 modalTitle.classList.remove('text-green-600', 'text-gray-800');
                 modalTitle.classList.add('text-red-500');
+            } else {
+                modalTitle.classList.remove('text-red-500', 'text-green-600');
+                modalTitle.classList.add('text-gray-800');
+            }
+
+
+            modalCloseButton.onclick = () => {
+                const currentDiffKey = getDifficultyKey();
+                // If the current word is a custom word, we go back to main menu after win/loss
+                if (secretCategory === 'Custom Word' || secretWord.trim() === '') {
+                     GAME_SCORE = 0; // Reset session score after a custom game (since it's a one-off)
+                     showMainMenuModal();
+                } else {
+                     initGame(currentDiffKey); // Continue session with a random word
+                }
+                modal.classList.add('hidden');
+            };
+            
+            if (type === 'loss') {
                 // If they lose, the score session ends, so the next game is fresh (score 0)
                 modalCloseButton.textContent = "Start New Session";
                 modalCloseButton.onclick = () => {
                     GAME_SCORE = 0; // Reset score on fresh start after loss
-                    showDifficultyModal();
+                    showMainMenuModal();
                 };
             }
+            
+            modalCloseButton.classList.remove('hidden');
 
             difficultyOptions.classList.add('hidden');
+            customWordArea.classList.add('hidden');
+            mainMenuOptions.classList.add('hidden');
             modal.classList.remove('hidden');
         }
 
-        function showDifficultyModal() {
-            modalTitle.textContent = "Choose Difficulty";
-            modalText.textContent = `High Score: ${HIGH_SCORE}`; 
+        // Function to show the main menu (combining difficulty selection and custom word button)
+        function showMainMenuModal() {
+            modalTitle.textContent = "Start New Game";
             
-            // If GAME_SCORE is > 0, show it as 'Continue Session'
+            // Show current session status
             if (GAME_SCORE > 0) {
                  modalText.innerHTML = `**Continuing Session:** Score ${GAME_SCORE}. High Score: ${HIGH_SCORE}`;
             } else {
-                 modalText.textContent = `Start New Session (High Score: ${HIGH_SCORE})`; 
+                 modalText.textContent = `Play a random word/phrase or create your own! (High Score: ${HIGH_SCORE})`; 
             }
+            
+            modalTitle.classList.remove('text-red-500', 'text-green-600');
+            modalTitle.classList.add('text-gray-800');
 
+
+            // Setup main menu view
             difficultyOptions.classList.remove('hidden');
+            customWordArea.classList.add('hidden');
             modalCloseButton.classList.add('hidden');
+            backToMenuButton.classList.add('hidden');
+            customWordButton.classList.remove('hidden');
+            mainMenuOptions.classList.remove('hidden');
+
 
             difficultyOptions.innerHTML = '';
             
-            // Create difficulty buttons
+            // Create difficulty buttons for RANDOM words
             Object.entries(DIFFICULTY_SETTINGS).forEach(([key, settings]) => {
                 const button = document.createElement('button');
                 button.textContent = `${settings.name} (${settings.guesses} Guesses)`;
+                // Use a different color to distinguish random word selection
                 button.className = 'bg-indigo-500 text-white font-bold py-3 px-2 rounded-lg hover:bg-indigo-600 transition duration-150 shadow-md';
                 button.onclick = () => {
-                    // If starting a new session from the initial modal, ensure score is 0
-                    if (GAME_SCORE === 0) {
-                         // Keep the current score if it's a win-streak, otherwise 0
-                    } else if (modalCloseButton.textContent === "Start New Session") {
-                        // This handles the reset after a loss
-                        GAME_SCORE = 0; 
-                    }
-                    initGame(key);
+                    GAME_SCORE = 0; // Start new session score
+                    initGame(key); // Use existing initGame for random word
                     modal.classList.add('hidden');
                 };
                 difficultyOptions.appendChild(button);
             });
+            
+            // Adjust difficultyOptions to display nicely above the custom button
+            difficultyOptions.classList.remove('grid-cols-1');
+            difficultyOptions.classList.add('grid-cols-3');
+
 
             modal.classList.remove('hidden');
         }
 
+
+        // NEW: Function to show the custom word input screen
+        function showCustomWordModal() {
+            modalTitle.textContent = "Enter Secret Word/Phrase";
+            modalText.textContent = "Must be 3-25 characters long (A-Z, spaces, or hyphens). Category is optional.";
+
+            difficultyOptions.classList.add('hidden');
+            modalCloseButton.classList.add('hidden');
+            customWordButton.classList.add('hidden');
+            
+            customWordArea.classList.remove('hidden');
+            backToMenuButton.classList.remove('hidden');
+            
+            // Clear any previous input/error
+            customWordInput.value = '';
+            customCategoryInput.value = '';
+            customWordError.classList.add('hidden');
+        }
+
+
+        // NEW: Function to handle the start of the custom game
+        function attemptStartCustomGame() {
+            // Trim and convert word to uppercase for validation and game use
+            const word = customWordInput.value.toUpperCase().trim(); 
+            const category = customCategoryInput.value;
+            
+            // Validation: 3 to 25 characters, allowing A-Z, space, or hyphen. Must contain at least one letter.
+            const isValid = /^[A-Z\s-]{3,25}$/.test(word) && /[A-Z]/.test(word);
+
+
+            if (!isValid) {
+                customWordError.textContent = "The secret phrase must be 3-25 characters long (A-Z, spaces, or hyphens) and contain at least one letter.";
+                customWordError.classList.remove('hidden');
+                return;
+            }
+            
+            // If valid, start game on Medium difficulty (default for custom games)
+            const difficultyKey = 'M'; 
+            
+            // Custom word games are single-round, so reset score
+            GAME_SCORE = 0; 
+            initCustomGame(word, category, difficultyKey);
+            modal.classList.add('hidden');
+        }
+
+
         // --- Event Listeners and Initialization ---
 
         window.onload = () => {
-            showDifficultyModal();
+            // 1. Check if a game should be loaded immediately (e.g., if the user clicks the Load button)
+            checkSavedGameAndShowLoadButton(); 
             
-            // Handle keyboard input globally
+            // 2. Show Main Menu Modal
+            showMainMenuModal();
+            
+            // 3. Handle keyboard input globally
             document.addEventListener('keydown', (event) => {
                 const key = event.key.toUpperCase();
                 
@@ -493,6 +807,14 @@
                 if (modal.classList.contains('hidden') === false) {
                     if (key === 'ENTER' && !modalCloseButton.classList.contains('hidden')) {
                         modalCloseButton.click();
+                    }
+                    
+                    // Allow ENTER to start custom game if inputs are visible
+                    if (customWordArea.classList.contains('hidden') === false && event.target.tagName === 'INPUT') {
+                        if (key === 'ENTER') {
+                            attemptStartCustomGame();
+                            event.preventDefault(); // Prevent default form submission behavior if there was one
+                        }
                     }
                     return; // Ignore other key presses when modal is open
                 }
@@ -507,12 +829,38 @@
                 } 
             });
 
-            // Handle button clicks
+            // 4. Handle button clicks
             hintButton.addEventListener('click', handleHint);
-            // Reset button now always opens the difficulty modal, allowing user to start fresh (score 0) or continue
+            
+            // Reset button now always opens the main menu
             resetButton.addEventListener('click', () => { 
                 GAME_SCORE = 0; // Ensures a completely fresh start when reset button is pressed mid-game
-                showDifficultyModal(); 
+                showMainMenuModal(); 
+            });
+
+            // Load button event listener
+            loadButton.addEventListener('click', () => {
+                if(loadGameState()) {
+                    modal.classList.add('hidden'); // Close modal if open
+                }
+            });
+
+            // NEW CUSTOM WORD LISTENERS
+            customWordButton.addEventListener('click', showCustomWordModal);
+            
+            backToMenuButton.addEventListener('click', () => {
+                // Clear inputs on back
+                customWordInput.value = '';
+                customCategoryInput.value = '';
+                customWordError.classList.add('hidden');
+                showMainMenuModal();
+            });
+            
+            startCustomGameButton.addEventListener('click', attemptStartCustomGame);
+            
+            // Ensure inputs automatically convert to uppercase and only allow valid characters (A-Z, space, hyphen)
+            customWordInput.addEventListener('input', (e) => {
+                 e.target.value = e.target.value.toUpperCase().replace(/[^A-Z\s-]/g, ''); 
             });
         };
     </script>
