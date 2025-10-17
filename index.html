@@ -27,11 +27,14 @@
             font-weight: 600;
             border-radius: 8px;
             cursor: pointer;
-            transition: all 0.1s;
+            /* Added shadow and transition for visual polish */
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); 
+            transition: all 0.2s ease-in-out;
+            margin: 4px; /* Added margin for better spacing */
         }
         .letter-button:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
         }
         .correct-guess {
             background-color: #10b981; /* Green-500 */
@@ -55,10 +58,24 @@
             stroke: #4b5563; /* Gray-600 */
             stroke-width: 4;
             stroke-linecap: round;
+            /* Added transition for smooth reveal */
+            transition: visibility 0s, opacity 0.3s ease-in; 
         }
         /* Hide all parts initially */
         #hangman-parts .hangman-part {
             visibility: hidden;
+            opacity: 0; /* Use opacity for fade effect */
+        }
+        /* Override for visible parts */
+        #hangman-parts .hangman-part[style*="visibility: visible"] {
+            opacity: 1;
+        }
+
+        /* Improved Keyboard Layout */
+        #keyboard {
+            display: flex;
+            flex-wrap: wrap; /* Allows buttons to wrap to the next line */
+            justify-content: center;
         }
     </style>
 </head>
@@ -82,13 +99,12 @@
             <!-- Hangman Drawing (SVG) -->
             <div class="w-full md:w-2/5 flex justify-center p-4 bg-white rounded-lg border border-gray-200 shadow-md">
                 <svg id="hangman-svg" width="200" height="250" viewBox="0 0 200 250" class="text-gray-700">
-                    <!-- Base -->
-                    <line x1="20" y1="240" x2="180" y2="240" class="hangman-part" stroke="#6b7280" stroke-width="6"/> 
-                    <!-- Post -->
-                    <line x1="100" y1="240" x2="100" y2="20" class="hangman-part" stroke="#6b7280" stroke-width="6"/> 
-                    <line x1="100" y1="20" x2="150" y2="20" class="hangman-part" stroke="#6b7280" stroke-width="6"/> 
+                    <!-- Base Structure -->
+                    <line x1="20" y1="240" x2="180" y2="240" class="hangman-part" stroke="#6b7280" stroke-width="6" style="visibility: visible; opacity: 1; transition: none;"/> 
+                    <line x1="100" y1="240" x2="100" y2="20" class="hangman-part" stroke="#6b7280" stroke-width="6" style="visibility: visible; opacity: 1; transition: none;"/> 
+                    <line x1="100" y1="20" x2="150" y2="20" class="hangman-part" stroke="#6b7280" stroke-width="6" style="visibility: visible; opacity: 1; transition: none;"/> 
                     <!-- Noose -->
-                    <line x1="150" y1="20" x2="150" y2="50" class="hangman-part" stroke="#6b7280" stroke-width="4"/> 
+                    <line x1="150" y1="20" x2="150" y2="50" class="hangman-part" stroke="#6b7280" stroke-width="4" style="visibility: visible; opacity: 1; transition: none;"/> 
                     
                     <g id="hangman-parts">
                         <!-- Head (0) -->
@@ -103,7 +119,11 @@
                         <line id="part-4" x1="150" y1="170" x2="120" y2="200" class="hangman-part"/>
                         <!-- Right Leg (5) -->
                         <line id="part-5" x1="150" y1="170" x2="180" y2="200" class="hangman-part"/>
-                        <!-- Game Over/Max Guesses (6, 7, 8) - used for higher difficulty -->
+                        <!-- Left Eye - NEW (6) -->
+                        <line id="part-6" x1="140" y1="65" x2="145" y2="70" class="hangman-part stroke-red-500" stroke-width="2"/>
+                        <!-- Right Eye - NEW (7) -->
+                        <line id="part-7" x1="155" y1="65" x2="160" y2="70" class="hangman-part stroke-red-500" stroke-width="2"/>
+                        <!-- NOTE: Total 8 parts (0-7) for 8 incorrect guesses in Easy Mode -->
                     </g>
                 </svg>
             </div>
@@ -135,7 +155,8 @@
         </div>
 
         <!-- Letter Buttons -->
-        <div id="keyboard" class="grid grid-cols-7 sm:grid-cols-9 md:grid-cols-13 gap-2 p-4 bg-gray-50 rounded-lg shadow-inner">
+        <!-- Updated to use flex for better responsive flow -->
+        <div id="keyboard" class="flex flex-wrap justify-center gap-1 p-4 bg-gray-50 rounded-lg shadow-inner">
             <!-- Buttons A-Z will be injected here by JavaScript -->
         </div>
     </div>
@@ -156,28 +177,31 @@
 
 
     <script>
-        // --- Game Configuration (Updated with Categories) ---
+        // --- Game Configuration (Updated with Python-centric words and Categories) ---
         const WORD_LIST = [
+            // Python Specific Terms (Enhanced for the theme)
             { word: "PYTHON", category: "Programming Language" },
-            { word: "CODING", category: "General Tech" },
+            { word: "FLASK", category: "Python Framework" },
+            { word: "DJANGO", category: "Python Framework" },
+            { word: "TUPLE", category: "Python Data Structure" },
+            { word: "LIST", category: "Python Data Structure" },
+            { word: "IMPORT", category: "Python Keyword" },
+            { word: "ASYNC", category: "Python Keyword" },
+            { word: "LAMBDA", category: "Python Function" },
+            
+            // General CS/Tech Terms
             { word: "GEMINI", category: "AI Model" },
             { word: "CANVAS", category: "Frontend Dev" },
-            { word: "PROJECT", category: "General Tech" },
-            { word: "DEVELOP", category: "General Tech" },
-            { word: "PROGRAM", category: "General Tech" },
-            { word: "KEYWORD", category: "Programming Term" },
-            { word: "FUNCTION", category: "Programming Term" },
-            { word: "VARIABLE", category: "Programming Term" },
             { word: "ALGORITHM", category: "Computer Science" },
             { word: "DATABASE", category: "Data Storage" },
-            { word: "INTERFACE", category: "General Tech" },
             { word: "SECURITY", category: "IT Term" },
             { word: "NETWORK", category: "IT Term" },
             { word: "COMPILER", category: "Programming Tool" },
             { word: "BOOLEAN", category: "Computer Science" },
             { word: "HARDWARE", category: "Computer Parts" },
             { word: "SOFTWARE", category: "Computer Parts" },
-            { word: "CONSOLE", category: "Programming Tool" }
+            { word: "FUNCTION", category: "Programming Term" },
+            { word: "VARIABLE", category: "Programming Term" },
         ];
 
         const DIFFICULTY_SETTINGS = {
@@ -235,11 +259,13 @@
             wordDisplay.textContent = display.trim();
 
             // 2. Render Hangman
-            // Only show the first 6 parts, as that's the maximum distinct drawing we have.
-            // For higher counts, the last visible drawing remains.
-            const partsToShow = Math.min(incorrectCount, 6); 
+            // Use the actual number of SVG parts (now 8) to show corresponding incorrect guesses.
+            const partsToShow = Math.min(incorrectCount, hangmanParts.length); 
             for (let i = 0; i < hangmanParts.length; i++) {
-                hangmanParts[i].style.visibility = i < partsToShow ? 'visible' : 'hidden';
+                // Apply 'visible' and 'opacity: 1' to show the part with transition
+                const isVisible = i < partsToShow;
+                hangmanParts[i].style.visibility = isVisible ? 'visible' : 'hidden';
+                hangmanParts[i].style.opacity = isVisible ? '1' : '0';
             }
 
             // 3. Render Status (Updated to include HIGH_SCORE and CATEGORY)
@@ -254,8 +280,10 @@
             Array.from(keyboard.children).forEach(button => {
                 const letter = button.dataset.letter;
                 button.disabled = guessedLetters.has(letter);
-                button.classList.remove('correct-guess', 'incorrect-guess', 'disabled-button');
                 
+                // Reset classes before applying new ones
+                button.classList.remove('correct-guess', 'incorrect-guess', 'bg-white', 'text-gray-800', 'border', 'border-gray-300', 'hover:bg-gray-200');
+
                 if (button.disabled) {
                     if (secretWord.includes(letter)) {
                         button.classList.add('correct-guess');
@@ -263,13 +291,16 @@
                         button.classList.add('incorrect-guess');
                     }
                 } else {
+                    // Default active style
                     button.classList.add('bg-white', 'text-gray-800', 'border', 'border-gray-300', 'hover:bg-gray-200');
                 }
             });
             
             hintButton.disabled = hintUsed;
             hintButton.classList.toggle('bg-gray-400', hintUsed);
+            hintButton.classList.toggle('hover:bg-gray-400', hintUsed);
             hintButton.classList.toggle('bg-yellow-500', !hintUsed);
+            hintButton.classList.toggle('hover:bg-yellow-600', !hintUsed);
         
             // 5. Check Win/Loss (Updated to save High Score)
             if (wordComplete) {
@@ -287,6 +318,7 @@
                 disableGameInteraction();
             } else if (incorrectCount >= maxIncorrectGuesses) {
                 showResultModal("Game Over!", `You ran out of guesses. The word was **${secretWord}**.`, 'loss');
+                // Score reset is implicitly handled when starting a new game session via modal
                 disableGameInteraction();
             }
         }
@@ -345,7 +377,8 @@
                 const letter = String.fromCharCode(65 + i);
                 const button = document.createElement('button');
                 button.textContent = letter;
-                button.className = 'letter-button bg-white text-gray-800 border border-gray-300 hover:bg-gray-200';
+                // Changed from grid to flex, so we only need 'letter-button' class
+                button.className = 'letter-button'; 
                 button.dataset.letter = letter;
                 button.onclick = () => handleGuess(letter);
                 keyboard.appendChild(button);
@@ -380,17 +413,29 @@
             modalTitle.textContent = title;
             modalText.innerHTML = text; // Use innerHTML for bold text
             
-            modalCloseButton.textContent = "Play Again";
-            modalCloseButton.onclick = showDifficultyModal;
+            modalCloseButton.textContent = "Play Next Word";
+            // Important: We reset GAME_SCORE only if starting a FRESH game (via the reset button logic in showDifficultyModal)
+            // But if they click 'Play Next Word' (modalCloseButton), the score carries over, which is desired for chaining wins.
+            modalCloseButton.onclick = () => {
+                const currentDiffKey = getDifficultyKey();
+                initGame(currentDiffKey);
+                modal.classList.add('hidden');
+            };
             modalCloseButton.classList.remove('hidden');
 
             // Style based on outcome
             if (type === 'win') {
-                modalTitle.classList.remove('text-red-500');
+                modalTitle.classList.remove('text-red-500', 'text-gray-800');
                 modalTitle.classList.add('text-green-600');
             } else if (type === 'loss') {
-                modalTitle.classList.remove('text-green-600');
+                modalTitle.classList.remove('text-green-600', 'text-gray-800');
                 modalTitle.classList.add('text-red-500');
+                // If they lose, the score session ends, so the next game is fresh (score 0)
+                modalCloseButton.textContent = "Start New Session";
+                modalCloseButton.onclick = () => {
+                    GAME_SCORE = 0; // Reset score on fresh start after loss
+                    showDifficultyModal();
+                };
             }
 
             difficultyOptions.classList.add('hidden');
@@ -399,8 +444,15 @@
 
         function showDifficultyModal() {
             modalTitle.textContent = "Choose Difficulty";
-            // Updated to show High Score
-            modalText.textContent = `Your Current Score: ${GAME_SCORE}. High Score: ${HIGH_SCORE}`; 
+            modalText.textContent = `High Score: ${HIGH_SCORE}`; 
+            
+            // If GAME_SCORE is > 0, show it as 'Continue Session'
+            if (GAME_SCORE > 0) {
+                 modalText.innerHTML = `**Continuing Session:** Score ${GAME_SCORE}. High Score: ${HIGH_SCORE}`;
+            } else {
+                 modalText.textContent = `Start New Session (High Score: ${HIGH_SCORE})`; 
+            }
+
             difficultyOptions.classList.remove('hidden');
             modalCloseButton.classList.add('hidden');
 
@@ -409,9 +461,16 @@
             // Create difficulty buttons
             Object.entries(DIFFICULTY_SETTINGS).forEach(([key, settings]) => {
                 const button = document.createElement('button');
-                button.textContent = settings.name;
+                button.textContent = `${settings.name} (${settings.guesses} Guesses)`;
                 button.className = 'bg-indigo-500 text-white font-bold py-3 px-2 rounded-lg hover:bg-indigo-600 transition duration-150 shadow-md';
                 button.onclick = () => {
+                    // If starting a new session from the initial modal, ensure score is 0
+                    if (GAME_SCORE === 0) {
+                         // Keep the current score if it's a win-streak, otherwise 0
+                    } else if (modalCloseButton.textContent === "Start New Session") {
+                        // This handles the reset after a loss
+                        GAME_SCORE = 0; 
+                    }
                     initGame(key);
                     modal.classList.add('hidden');
                 };
@@ -429,9 +488,13 @@
             // Handle keyboard input globally
             document.addEventListener('keydown', (event) => {
                 const key = event.key.toUpperCase();
-                if (key.length === 1 && 'A' <= key && key <= 'Z' && !modal.classList.contains('hidden')) {
-                    // Do nothing if modal is open (waiting for difficulty/restart)
-                    return; 
+                
+                // If modal is open, only allow ENTER key to potentially close it if a button is focused.
+                if (modal.classList.contains('hidden') === false) {
+                    if (key === 'ENTER' && !modalCloseButton.classList.contains('hidden')) {
+                        modalCloseButton.click();
+                    }
+                    return; // Ignore other key presses when modal is open
                 }
                 
                 if (key.length === 1 && 'A' <= key && key <= 'Z') {
@@ -441,15 +504,16 @@
                     }
                 } else if (key === 'H' && !hintButton.disabled) {
                     handleHint();
-                } else if (key === 'ENTER' && !modal.classList.contains('hidden')) {
-                    // Prevent default form submission behavior if an input field were present
-                    event.preventDefault();
-                }
+                } 
             });
 
             // Handle button clicks
             hintButton.addEventListener('click', handleHint);
-            resetButton.addEventListener('click', showDifficultyModal);
+            // Reset button now always opens the difficulty modal, allowing user to start fresh (score 0) or continue
+            resetButton.addEventListener('click', () => { 
+                GAME_SCORE = 0; // Ensures a completely fresh start when reset button is pressed mid-game
+                showDifficultyModal(); 
+            });
         };
     </script>
 </body>
